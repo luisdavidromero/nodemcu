@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor de Frío - Terraza & Supermercado</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --status-ok: #22c55e;
+            --status-alert: #ef4444;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); padding: 20px; }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        h1 { font-size: 1.4rem; font-weight: 600; }
+        .last-update { font-size: 0.85rem; color: var(--text-muted); }
+
+        .section-title {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            margin: 20px 0 12px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid var(--border-color);
+            position: relative;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .sensor-name { font-weight: 600; font-size: 1rem; }
+        
+        .status-badge {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: var(--status-ok);
+            box-shadow: 0 0 8px var(--status-ok);
+        }
+
+        .status-badge.alert {
+            background-color: var(--status-alert);
+            box-shadow: 0 0 8px var(--status-alert);
+        }
+
+        .readings-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-top: 8px;
+        }
+
+        .metric { display: flex; flex-direction: column; }
+        .metric-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
+        
+        .metric-value { font-size: 2.2rem; font-weight: 700; margin-top: 2px; }
+        .metric-value.temp { color: #38bdf8; }
+
+        .unit { font-size: 1.2rem; font-weight: 400; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Panel de Monitorización</h1>
+        <div class="last-update">Última lectura: <span id="time-stamp">--:--:--</span></div>
+    </header>
+
+    <div class="section-title">Prueba de Campo</div>
+    <div class="grid-container">
+        <div class="card">
+            <div class="card-header">
+                <span class="sensor-name">Terraza (Exterior)</span>
+                <div class="status-badge" id="badge-terraza"></div>
+            </div>
+            <div class="readings-container">
+                <div class="metric">
+                    <span class="metric-label">Temperatura</span>
+                    <div class="metric-value temp"><span id="temp-terraza">--</span><span class="unit">°C</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURACIÓN DE CREDENCIALES
+        const CONFIG = {
+            username: "TU_USUARIO_ADAFRUIT",
+            aioKey: "TU_ACTIVE_KEY_ADAFRUIT",
+            feedKey: "terraza-temp"
+        };
+
+        async function obtenerTemperaturaReal() {
+            const url = `https://io.adafruit.com/api/v2/${CONFIG.username}/feeds/${CONFIG.feedKey}/data/last`;
+            
+            try {
+                const response = await fetch(url, {
+                    headers: { "X-AIO-Key": CONFIG.aioKey }
+                });
+
+                if (!response.ok) throw new Error("Error en la petición a Adafruit IO");
+
+                const data = await response.json();
+                const temperatura = parseFloat(data.value).toFixed(1);
+
+                // Actualizar interfaz HTML
+                document.getElementById("temp-terraza").innerText = temperatura;
+                
+                // Formatear hora de la lectura
+                const fechaLectura = new Date(data.created_at);
+                document.getElementById("time-stamp").innerText = fechaLectura.toLocaleTimeString();
+
+                // Estado visual del LED (Alerta si supera rango de prueba, ej: 35 °C)
+                const badge = document.getElementById("badge-terraza");
+                if (temperatura > 35.0 || temperatura < 0.0) {
+                    badge.classList.add("alert");
+                } else {
+                    badge.classList.remove("alert");
+                }
+
+            } catch (error) {
+                console.error("Error al obtener los datos:", error);
+                document.getElementById("temp-terraza").innerText = "ERR";
+            }
+        }
+
+        // Consultar API cada 15 segundos
+        setInterval(obtenerTemperaturaReal, 15000);
+        
+        // Primera carga al abrir la página
+        obtenerTemperaturaReal();
+    </script>
+</body>
+</html>
