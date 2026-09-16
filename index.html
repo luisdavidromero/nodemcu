@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Temperatura Exterior</title>
+    <title>Temperatura Exterior Terraza</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -13,9 +13,7 @@
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
             --accent-blue: #38bdf8;
-            --accent-glow: rgba(56, 189, 248, 0.15);
             --status-ok: #22c55e;
-            --status-alert: #ef4444;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
@@ -48,7 +46,7 @@
             border-radius: 16px;
         }
 
-        h1 { font-size: 1.25rem; font-weight: 600; }
+        h1 { font-size: 1.15rem; font-weight: 600; }
         
         .header-actions { display: flex; align-items: center; gap: 12px; }
         .last-update { font-size: 0.8rem; color: var(--text-muted); }
@@ -74,7 +72,6 @@
             align-items: center;
             justify-content: space-between;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-            position: relative;
         }
 
         .temp-display { display: flex; align-items: baseline; gap: 4px; }
@@ -111,7 +108,7 @@
 
     <div class="container">
         <header>
-            <h1>Temperatura Exterior</h1>
+            <h1>Temperatura Exterior Terraza</h1>
             <div class="header-actions">
                 <div class="last-update" id="time-stamp">--:--:--</div>
                 <button class="btn-config" onclick="configurarKey()">🔑 Key</button>
@@ -124,8 +121,8 @@
                 <span class="temp-unit">°C</span>
             </div>
             <div class="status-pill">
-                <div class="status-dot" id="status-dot"></div>
-                <span id="status-text">Online</span>
+                <div class="status-dot"></div>
+                <span>Online</span>
             </div>
         </div>
 
@@ -145,12 +142,10 @@
         function getAioKey() {
             let key = localStorage.getItem("ADA_AIO_KEY");
             if (!key) {
-                key = prompt("Por favor, introduce tu Adafruit IO Active Key:");
-                if (key) {
-                    localStorage.setItem("ADA_AIO_KEY", key.trim());
-                }
+                key = prompt("Introduce tu Adafruit IO Active Key:");
+                if (key) localStorage.setItem("ADA_AIO_KEY", key.trim());
             }
-            return key;
+            return key ? key.trim() : null;
         }
 
         function configurarKey() {
@@ -161,43 +156,46 @@
             }
         }
 
-        // 1. Obtener última temperatura (Rápido y aislado)
-        async function obtenerUltimaLectura(aioKey) {
-            const url = `https://io.adafruit.com/api/v2/${USERNAME}/feeds/${FEED_KEY}/data/last`;
+        async function actualizarDashboard() {
+            const aioKey = getAioKey();
+            if (!aioKey) {
+                document.getElementById("temp-exterior").innerText = "NO KEY";
+                return;
+            }
+
+            // Uso de url con x-aio-key como parametro para evitar pre-flight CORS
+            const url = `https://io.adafruit.com/api/v2/${USERNAME}/feeds/${FEED_KEY}/data?limit=15&x-aio-key=${aioKey}`;
+
             try {
-                const res = await fetch(url, { headers: { "X-AIO-Key": aioKey } });
+                const res = await fetch(url);
                 if (res.status === 401 || res.status === 403) {
                     localStorage.removeItem("ADA_AIO_KEY");
                     document.getElementById("temp-exterior").innerText = "KEY ERR";
                     return;
                 }
-                const data = await res.json();
-                document.getElementById("temp-exterior").innerText = parseFloat(data.value).toFixed(1);
-                const fecha = new Date(data.created_at);
-                document.getElementById("time-stamp").innerText = fecha.toLocaleTimeString([], { hour: '2-2-digit', minute: '2-2-digit' });
-            } catch (err) {
-                console.error("Error obteniendo última lectura:", err);
-                document.getElementById("temp-exterior").innerText = "ERR";
-            }
-        }
 
-        // 2. Obtener historial para la gráfica
-        async function obtenerHistórico(aioKey) {
-            const url = `https://io.adafruit.com/api/v2/${USERNAME}/feeds/${FEED_KEY}/data?limit=15`;
-            try {
-                const res = await fetch(url, { headers: { "X-AIO-Key": aioKey } });
-                if (!res.ok) return;
-                
+                if (!res.ok) throw new Error("API Error");
+
                 const data = await res.json();
                 if (!Array.isArray(data) || data.length === 0) return;
 
-                const datosReversos = data.reverse();
+                // Ultimo dato recibido
+                const ultimaLectura = data[0];
+                document.getElementById("temp-exterior").innerText = parseFloat(ultimaLectura.value).toFixed(1);
+                
+                const fecha = new Date(ultimaLectura.created_at);
+                document.getElementById("time-stamp").innerText = fecha.toLocaleTimeString([], { hour: '2-2-digit', minute: '2-2-digit' });
+
+                // Invertir datos para el grafico
+                const datosReversos = [...data].reverse();
                 const labels = datosReversos.map(item => new Date(item.created_at).toLocaleTimeString([], { hour: '2-2-digit', minute: '2-2-digit' }));
                 const valores = datosReversos.map(item => parseFloat(item.value));
 
                 renderizarGrafico(labels, valores);
+
             } catch (err) {
-                console.error("Error obteniendo histórico:", err);
+                console.error("Fallo consultando Adafruit IO:", err);
+                document.getElementById("temp-exterior").innerText = "ERR";
             }
         }
 
@@ -231,14 +229,6 @@
                     }
                 }
             });
-        }
-
-        function actualizarDashboard() {
-            const key = getAioKey();
-            if (key) {
-                obtenerUltimaLectura(key);
-                obtenerHistórico(key);
-            }
         }
 
         setInterval(actualizarDashboard, 30000);
