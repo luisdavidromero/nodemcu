@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Temperatura Exterior Terraza</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
@@ -25,11 +24,12 @@
             padding: 24px 16px;
             display: flex;
             justify-content: center;
+            align-items: center;
         }
 
         .container {
             width: 100%;
-            max-width: 650px;
+            max-width: 480px;
             display: flex;
             flex-direction: column;
             gap: 20px;
@@ -46,7 +46,7 @@
             border-radius: 16px;
         }
 
-        h1 { font-size: 1.15rem; font-weight: 600; }
+        h1 { font-size: 1.1rem; font-weight: 600; }
         
         .header-actions { display: flex; align-items: center; gap: 12px; }
         .last-update { font-size: 0.8rem; color: var(--text-muted); }
@@ -67,7 +67,7 @@
             backdrop-filter: blur(12px);
             border: 1px solid var(--card-border);
             border-radius: 20px;
-            padding: 28px 24px;
+            padding: 32px 24px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -75,8 +75,8 @@
         }
 
         .temp-display { display: flex; align-items: baseline; gap: 4px; }
-        .temp-value { font-size: 4rem; font-weight: 800; color: var(--accent-blue); line-height: 1; }
-        .temp-unit { font-size: 1.75rem; font-weight: 300; color: var(--text-muted); }
+        .temp-value { font-size: 4.5rem; font-weight: 800; color: var(--accent-blue); line-height: 1; }
+        .temp-unit { font-size: 2rem; font-weight: 300; color: var(--text-muted); }
 
         .status-pill {
             display: flex;
@@ -91,17 +91,6 @@
         }
 
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--status-ok); }
-
-        .chart-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--card-border);
-            border-radius: 20px;
-            padding: 20px;
-        }
-
-        .chart-header { font-size: 0.9rem; font-weight: 500; color: var(--text-muted); margin-bottom: 16px; }
-        .chart-wrapper { position: relative; height: 220px; width: 100%; }
     </style>
 </head>
 <body>
@@ -125,19 +114,11 @@
                 <span>Online</span>
             </div>
         </div>
-
-        <div class="chart-card">
-            <div class="chart-header">Histórico reciente</div>
-            <div class="chart-wrapper">
-                <canvas id="tempChart"></canvas>
-            </div>
-        </div>
     </div>
 
     <script>
         const USERNAME = "descor";
         const FEED_KEY = "terraza-temp";
-        let tempChart = null;
 
         function getAioKey() {
             let key = localStorage.getItem("ADA_AIO_KEY");
@@ -152,19 +133,19 @@
             const nuevaKey = prompt("Introduce tu nueva Adafruit IO Active Key:");
             if (nuevaKey) {
                 localStorage.setItem("ADA_AIO_KEY", nuevaKey.trim());
-                actualizarDashboard();
+                obtenerTemperatura();
             }
         }
 
-        async function actualizarDashboard() {
+        async function obtenerTemperatura() {
             const aioKey = getAioKey();
             if (!aioKey) {
                 document.getElementById("temp-exterior").innerText = "NO KEY";
                 return;
             }
 
-            // Uso de url con x-aio-key como parametro para evitar pre-flight CORS
-            const url = `https://io.adafruit.com/api/v2/${USERNAME}/feeds/${FEED_KEY}/data?limit=15&x-aio-key=${aioKey}`;
+            // Peticion directa a la ultima lectura registrada
+            const url = `https://io.adafruit.com/api/v2/${USERNAME}/feeds/${FEED_KEY}/data/last?x-aio-key=${aioKey}`;
 
             try {
                 const res = await fetch(url);
@@ -177,21 +158,10 @@
                 if (!res.ok) throw new Error("API Error");
 
                 const data = await res.json();
-                if (!Array.isArray(data) || data.length === 0) return;
-
-                // Ultimo dato recibido
-                const ultimaLectura = data[0];
-                document.getElementById("temp-exterior").innerText = parseFloat(ultimaLectura.value).toFixed(1);
+                document.getElementById("temp-exterior").innerText = parseFloat(data.value).toFixed(1);
                 
-                const fecha = new Date(ultimaLectura.created_at);
+                const fecha = new Date(data.created_at);
                 document.getElementById("time-stamp").innerText = fecha.toLocaleTimeString([], { hour: '2-2-digit', minute: '2-2-digit' });
-
-                // Invertir datos para el grafico
-                const datosReversos = [...data].reverse();
-                const labels = datosReversos.map(item => new Date(item.created_at).toLocaleTimeString([], { hour: '2-2-digit', minute: '2-2-digit' }));
-                const valores = datosReversos.map(item => parseFloat(item.value));
-
-                renderizarGrafico(labels, valores);
 
             } catch (err) {
                 console.error("Fallo consultando Adafruit IO:", err);
@@ -199,40 +169,8 @@
             }
         }
 
-        function renderizarGrafico(labels, data) {
-            const canvas = document.getElementById('tempChart');
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
-
-            if (tempChart) tempChart.destroy();
-
-            tempChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: data,
-                        borderColor: '#38bdf8',
-                        borderWidth: 2,
-                        backgroundColor: 'rgba(56, 189, 248, 0.1)',
-                        fill: true,
-                        tension: 0.3
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 } } },
-                        y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
-                    }
-                }
-            });
-        }
-
-        setInterval(actualizarDashboard, 30000);
-        actualizarDashboard();
+        setInterval(obtenerTemperatura, 30000);
+        obtenerTemperatura();
     </script>
 </body>
 </html>
