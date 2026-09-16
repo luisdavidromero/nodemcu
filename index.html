@@ -144,11 +144,13 @@
                 return;
             }
 
-            // Peticion directa a la ultima lectura registrada
-            const url = `https://io.adafruit.com/api/v2/${USERNAME}/feeds/${FEED_KEY}/data/last?x-aio-key=${aioKey}`;
+            const url = `https://io.adafruit.com/api/v2/${USERNAME}/feeds/${FEED_KEY}/data/last`;
 
             try {
-                const res = await fetch(url);
+                const res = await fetch(url, {
+                    headers: { "X-AIO-Key": aioKey }
+                });
+
                 if (res.status === 401 || res.status === 403) {
                     localStorage.removeItem("ADA_AIO_KEY");
                     document.getElementById("temp-exterior").innerText = "KEY ERR";
