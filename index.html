@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Temperatura Exterior Terraza</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
@@ -13,6 +14,7 @@
             --text-muted: #94a3b8;
             --accent-blue: #38bdf8;
             --status-ok: #22c55e;
+            --status-err: #ef4444;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
@@ -91,6 +93,33 @@
         }
 
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--status-ok); }
+
+        /* Contenedor del gráfico y debug independiente */
+        .chart-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .chart-header { font-size: 0.9rem; font-weight: 500; color: var(--text-muted); }
+        .chart-wrapper { position: relative; height: 180px; width: 100%; }
+
+        .chart-debug {
+            font-family: monospace;
+            font-size: 0.75rem;
+            color: var(--status-err);
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px dashed var(--status-err);
+            padding: 8px 12px;
+            border-radius: 8px;
+            display: none;
+            word-break: break-all;
+        }
     </style>
 </head>
 <body>
@@ -114,11 +143,20 @@
                 <span>Online</span>
             </div>
         </div>
+
+        <div class="chart-card">
+            <div class="chart-header">Histórico reciente</div>
+            <div class="chart-wrapper">
+                <canvas id="tempChart"></canvas>
+            </div>
+            <div class="chart-debug" id="chart-debug"></div>
+        </div>
     </div>
 
     <script>
         const USERNAME = "descor";
         const FEED_KEY = "terraza-temp";
+        let tempChart = null;
 
         function getAioKey() {
             let key = localStorage.getItem("ADA_AIO_KEY");
@@ -133,11 +171,12 @@
             const nuevaKey = prompt("Introduce tu nueva Adafruit IO Active Key:");
             if (nuevaKey) {
                 localStorage.setItem("ADA_AIO_KEY", nuevaKey.trim());
-                obtenerTemperatura();
+                refrescarTodo();
             }
         }
 
-        async function obtenerTemperatura() {
+        // --- 1. LECTURA PRINCIPAL (TEMPERATURA ACTUAL) ---
+        async function obtenerTemperaturaActual() {
             const aioKey = getAioKey();
             if (!aioKey) {
                 document.getElementById("temp-exterior").innerText = "NO KEY";
@@ -157,7 +196,7 @@
                     return;
                 }
 
-                if (!res.ok) throw new Error("API Error");
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
                 const data = await res.json();
                 document.getElementById("temp-exterior").innerText = parseFloat(data.value).toFixed(1);
@@ -166,13 +205,90 @@
                 document.getElementById("time-stamp").innerText = fecha.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
             } catch (err) {
-                console.error("Fallo consultando Adafruit IO:", err);
+                console.error("Error en lectura actual:", err);
                 document.getElementById("temp-exterior").innerText = "ERR";
             }
         }
 
-        setInterval(obtenerTemperatura, 30000);
-        obtenerTemperatura();
+        // --- 2. LECTURA Y RENDERIZADO DEL HISTÓRICO ---
+        async function obtenerHistorico() {
+            const aioKey = getAioKey();
+            const debugBox = document.getElementById("chart-debug");
+            if (!aioKey) return;
+
+            // Pedimos los ultimos 15 datos registrados
+            const url = `https://io.adafruit.com/api/v2/${USERNAME}/feeds/${FEED_KEY}/data?limit=15`;
+
+            try {
+                const res = await fetch(url, {
+                    headers: { "X-AIO-Key": aioKey }
+                });
+
+                if (!res.ok) {
+                    throw new Error(`Error API (${res.status}: ${res.statusText})`);
+                }
+
+                const data = await res.json();
+
+                if (!Array.isArray(data) || data.length === 0) {
+                    throw new Error("La API no devolvió un array de datos válido.");
+                }
+
+                // Invertimos la lista para mostrar del mas antiguo al mas reciente
+                const datosReversos = [...data].reverse();
+                const labels = datosReversos.map(item => new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                const valores = datosReversos.map(item => parseFloat(item.value));
+
+                renderizarGrafico(labels, valores);
+                debugBox.style.display = "none";
+
+            } catch (err) {
+                console.error("Error cargando histórico:", err);
+                debugBox.innerText = `[DEBUG Histórico] ${err.message}`;
+                debugBox.style.display = "block";
+            }
+        }
+
+        function renderizarGrafico(labels, data) {
+            const canvas = document.getElementById('tempChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            if (tempChart) tempChart.destroy();
+
+            tempChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        borderColor: '#38bdf8',
+                        borderWidth: 2,
+                        backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                        y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        function refrescarTodo() {
+            obtenerTemperaturaActual();
+            obtenerHistorico();
+        }
+
+        setInterval(refrescarTodo, 30000);
+        refrescarTodo();
     </script>
 </body>
 </html>
