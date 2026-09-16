@@ -13,6 +13,7 @@
             --text-muted: #94a3b8;
             --accent-blue: #38bdf8;
             --status-ok: #22c55e;
+            --status-err: #ef4444;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
@@ -69,9 +70,16 @@
             border-radius: 20px;
             padding: 32px 24px;
             display: flex;
+            flex-direction: column;
+            gap: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-row {
+            display: flex;
             align-items: center;
             justify-content: space-between;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            width: 100%;
         }
 
         .temp-display { display: flex; align-items: baseline; gap: 4px; }
@@ -90,7 +98,25 @@
             color: var(--text-muted);
         }
 
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--status-ok); }
+        .status-dot { 
+            width: 8px; 
+            height: 8px; 
+            border-radius: 50%; 
+            background-color: var(--status-ok); 
+            transition: background-color 0.3s;
+        }
+
+        .debug-box {
+            font-family: monospace;
+            font-size: 0.75rem;
+            color: var(--status-err);
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px dashed var(--status-err);
+            padding: 10px;
+            border-radius: 8px;
+            word-break: break-all;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -105,20 +131,45 @@
         </header>
 
         <div class="main-card">
-            <div class="temp-display">
-                <span class="temp-value" id="temp-exterior">--</span>
-                <span class="temp-unit">°C</span>
+            <div class="card-row">
+                <div class="temp-display">
+                    <span class="temp-value" id="temp-exterior">--</span>
+                    <span class="temp-unit" id="temp-unit">°C</span>
+                </div>
+                <div class="status-pill">
+                    <div class="status-dot" id="status-dot"></div>
+                    <span id="status-text">Conectando...</span>
+                </div>
             </div>
-            <div class="status-pill">
-                <div class="status-dot"></div>
-                <span>Online</span>
-            </div>
+            
+            <div class="debug-box" id="debug-box"></div>
         </div>
     </div>
 
     <script>
         const USERNAME = "descor";
         const FEED_KEY = "terraza-temp";
+
+        function setDebug(msg, isError = true) {
+            const debugBox = document.getElementById("debug-box");
+            const statusDot = document.getElementById("status-dot");
+            const statusText = document.getElementById("status-text");
+
+            if (msg) {
+                debugBox.innerText = `[DEBUG] ${msg}`;
+                debugBox.style.display = "block";
+            } else {
+                debugBox.style.display = "none";
+            }
+
+            if (isError) {
+                statusDot.style.backgroundColor = "var(--status-err)";
+                statusText.innerText = "Error";
+            } else {
+                statusDot.style.backgroundColor = "var(--status-ok)";
+                statusText.innerText = "Online";
+            }
+        }
 
         function getAioKey() {
             let key = localStorage.getItem("ADA_AIO_KEY");
@@ -141,6 +192,7 @@
             const aioKey = getAioKey();
             if (!aioKey) {
                 document.getElementById("temp-exterior").innerText = "NO KEY";
+                setDebug("Falta la API Key en localStorage.");
                 return;
             }
 
@@ -154,20 +206,41 @@
                 if (res.status === 401 || res.status === 403) {
                     localStorage.removeItem("ADA_AIO_KEY");
                     document.getElementById("temp-exterior").innerText = "KEY ERR";
+                    setDebug(`HTTP ${res.status}: Clave AIO no válida o permisos insuficientes.`);
                     return;
                 }
 
-                if (!res.ok) throw new Error("API Error");
+                if (res.status === 404) {
+                    document.getElementById("temp-exterior").innerText = "404";
+                    setDebug(`HTTP 404: Feed '${FEED_KEY}' o usuario '${USERNAME}' no encontrado.`);
+                    return;
+                }
+
+                if (!res.ok) {
+                    document.getElementById("temp-exterior").innerText = "ERR";
+                    setDebug(`HTTP Error ${res.status}: ${res.statusText}`);
+                    return;
+                }
 
                 const data = await res.json();
+                
+                if (!data || data.value === undefined) {
+                    document.getElementById("temp-exterior").innerText = "N/D";
+                    setDebug("Respuesta vacía o sin campo 'value'.");
+                    return;
+                }
+
                 document.getElementById("temp-exterior").innerText = parseFloat(data.value).toFixed(1);
                 
                 const fecha = new Date(data.created_at);
                 document.getElementById("time-stamp").innerText = fecha.toLocaleTimeString([], { hour: '2-2-digit', minute: '2-2-digit' });
 
+                setDebug(null, false); // Todo OK
+
             } catch (err) {
-                console.error("Fallo consultando Adafruit IO:", err);
-                document.getElementById("temp-exterior").innerText = "ERR";
+                console.error(err);
+                document.getElementById("temp-exterior").innerText = "NET ERR";
+                setDebug(`Excepción JavaScript/Red: ${err.message}`);
             }
         }
 
