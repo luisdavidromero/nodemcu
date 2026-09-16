@@ -258,13 +258,12 @@
 
             let url = `https://io.adafruit.com/api/v2/${USERNAME}/feeds/${FEED_KEY}/data`;
 
-            // Construir parámetros de consulta según el rango seleccionado
             if (rangoActual === '1D') {
-                url += `?limit=288`; // 24h a razón de 1 dato cada 5 min (288 lecturas)
+                url += `?limit=288`; // 24h a razón de 1 dato cada 5 min
             } else if (rangoActual === '1S') {
-                url += `?resolution=60&limit=168`; // Promedios de 1 hora durante 7 días
+                url += `?resolution=60&limit=168`; // Promedios por hora durante 7 días
             } else if (rangoActual === '1M') {
-                url += `?resolution=1440&limit=30`; // Promedios de 1 día durante 30 días
+                url += `?resolution=1440&limit=30`; // Promedios por día durante 30 días
             }
 
             try {
@@ -281,7 +280,11 @@
                     if (rangoActual === '1D') {
                         return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     } else if (rangoActual === '1S') {
-                        return `${d.getDate()}/${d.getMonth()+1} ${d.getHours()}:00`;
+                        const dia = d.getDate();
+                        const mes = d.getMonth() + 1;
+                        const hora = String(d.getHours()).padStart(2, '0');
+                        const min = String(d.getMinutes()).padStart(2, '0');
+                        return `${dia}/${mes} ${hora}:${min}`;
                     } else {
                         return `${d.getDate()}/${d.getMonth()+1}`;
                     }
@@ -317,7 +320,7 @@
                         backgroundColor: 'rgba(56, 189, 248, 0.1)',
                         fill: true,
                         tension: 0.3,
-                        pointRadius: rangoActual === '1D' ? 0 : 2 // Oculta puntos en 1D para suavizar la línea
+                        pointRadius: rangoActual === '1D' ? 0 : 2
                     }]
                 },
                 options: {
@@ -327,7 +330,12 @@
                     scales: {
                         x: { 
                             grid: { display: false }, 
-                            ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: 6 } 
+                            ticks: { 
+                                color: '#94a3b8', 
+                                font: { size: 10 }, 
+                                maxTicksLimit: 5,
+                                autoSkip: true
+                            } 
                         },
                         y: { 
                             grid: { color: 'rgba(255, 255, 255, 0.05)' }, 
@@ -343,8 +351,7 @@
             obtenerHistorico();
         }
 
-        // Refresco automático cada 5 minutos (300.000 ms)
-        setInterval(refrescarTodo, 300000);
+        setInterval(refrescarTodo, 300000); // 5 minutos
         refrescarTodo();
     </script>
 </body>
