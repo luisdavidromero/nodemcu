@@ -3,31 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor de Frío - Terraza & Supermercado</title>
+    <title>Temperatura Exterior</title>
+    <!-- Chart.js para la gráfica del histórico -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --bg-color: #0f172a;
-            --card-bg: #1e293b;
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --card-border: rgba(255, 255, 255, 0.1);
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
-            --border-color: #334155;
+            --accent-blue: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.15);
             --status-ok: #22c55e;
             --status-alert: #ef4444;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
-        body { background-color: var(--bg-color); color: var(--text-main); padding: 20px; }
         
+        body { 
+            background: var(--bg-gradient); 
+            color: var(--text-main); 
+            min-height: 100vh;
+            padding: 24px 16px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 650px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
         header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 24px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid var(--border-color);
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            padding: 16px 20px;
+            border-radius: 16px;
         }
 
-        h1 { font-size: 1.4rem; font-weight: 600; }
+        h1 { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.02em; }
         
         .header-actions {
             display: flex;
@@ -35,102 +57,143 @@
             gap: 12px;
         }
 
-        .last-update { font-size: 0.85rem; color: var(--text-muted); }
+        .last-update { font-size: 0.8rem; color: var(--text-muted); }
 
         .btn-config {
-            background: none;
-            border: 1px solid var(--border-color);
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
             color: var(--text-muted);
-            padding: 4px 8px;
-            border-radius: 6px;
+            padding: 6px 10px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 0.75rem;
+            font-size: 0.8rem;
+            transition: all 0.2s ease;
         }
-        .btn-config:hover { background-color: var(--border-color); color: var(--text-main); }
+        .btn-config:hover { background: rgba(255, 255, 255, 0.15); color: var(--text-main); }
 
-        .section-title {
-            font-size: 1.1rem;
-            color: var(--text-muted);
-            margin: 20px 0 12px 0;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .grid-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 16px;
-        }
-
-        .card {
-            background-color: var(--card-bg);
-            border-radius: 12px;
-            padding: 16px;
-            border: 1px solid var(--border-color);
-            position: relative;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-        }
-
-        .card-header {
+        /* Tarjeta Principal de Temperatura */
+        .main-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 28px 24px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
+            justify-content: space-between;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
         }
 
-        .sensor-name { font-weight: 600; font-size: 1rem; }
-        
-        .status-badge {
-            width: 12px;
-            height: 12px;
+        .main-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 60%);
+            pointer-events: none;
+        }
+
+        .temp-display {
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+        }
+
+        .temp-value {
+            font-size: 4rem;
+            font-weight: 800;
+            color: var(--accent-blue);
+            line-height: 1;
+            letter-spacing: -0.03em;
+        }
+
+        .temp-unit {
+            font-size: 1.75rem;
+            font-weight: 300;
+            color: var(--text-muted);
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid var(--card-border);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             background-color: var(--status-ok);
-            box-shadow: 0 0 8px var(--status-ok);
+            box-shadow: 0 0 10px var(--status-ok);
         }
 
-        .status-badge.alert {
+        .status-dot.alert {
             background-color: var(--status-alert);
-            box-shadow: 0 0 8px var(--status-alert);
+            box-shadow: 0 0 10px var(--status-alert);
         }
 
-        .readings-container {
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            margin-top: 8px;
+        /* Contenedor del Gráfico */
+        .chart-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
         }
 
-        .metric { display: flex; flex-direction: column; }
-        .metric-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
-        
-        .metric-value { font-size: 2.2rem; font-weight: 700; margin-top: 2px; }
-        .metric-value.temp { color: #38bdf8; }
+        .chart-header {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
 
-        .unit { font-size: 1.2rem; font-weight: 400; }
+        .chart-wrapper {
+            position: relative;
+            height: 220px;
+            width: 100%;
+        }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>Panel de Monitorización</h1>
-        <div class="header-actions">
-            <div class="last-update">Última lectura: <span id="time-stamp">--:--:--</span></div>
-            <button class="btn-config" onclick="configurarKey()">🔑 Key</button>
-        </div>
-    </header>
-
-    <div class="section-title">Prueba de Campo</div>
-    <div class="grid-container">
-        <div class="card">
-            <div class="card-header">
-                <span class="sensor-name">Terraza (Exterior)</span>
-                <div class="status-badge" id="badge-terraza"></div>
+    <div class="container">
+        <header>
+            <h1>Temperatura Exterior</h1>
+            <div class="header-actions">
+                <div class="last-update" id="time-stamp">--:--:--</div>
+                <button class="btn-config" onclick="configurarKey()">🔑 Key</button>
             </div>
-            <div class="readings-container">
-                <div class="metric">
-                    <span class="metric-label">Temperatura</span>
-                    <div class="metric-value temp"><span id="temp-terraza">--</span><span class="unit">°C</span></div>
-                </div>
+        </header>
+
+        <!-- Bloque principal de lectura -->
+        <div class="main-card">
+            <div class="temp-display">
+                <span class="temp-value" id="temp-exterior">--</span>
+                <span class="temp-unit">°C</span>
+            </div>
+            <div class="status-pill">
+                <div class="status-dot" id="status-dot"></div>
+                <span id="status-text">Online</span>
+            </div>
+        </div>
+
+        <!-- Gráfica de histórico -->
+        <div class="chart-card">
+            <div class="chart-header">Histórico reciente</div>
+            <div class="chart-wrapper">
+                <canvas id="tempChart"></canvas>
             </div>
         </div>
     </div>
@@ -138,8 +201,8 @@
     <script>
         const USERNAME = "descor";
         const FEED_KEY = "terraza-temp";
+        let tempChart = null;
 
-        // Obtener o solicitar la API Key de Adafruit IO
         function getAioKey() {
             let key = localStorage.getItem("ADA_AIO_KEY");
             if (!key) {
@@ -151,68 +214,115 @@
             return key;
         }
 
-        // Permite reconfigurar la Key pulsando el botón de la cabecera
         function configurarKey() {
             const nuevaKey = prompt("Introduce tu nueva Adafruit IO Active Key:");
             if (nuevaKey) {
                 localStorage.setItem("ADA_AIO_KEY", nuevaKey.trim());
-                obtenerTemperaturaReal();
+                cargarDatosCompletos();
             }
         }
 
-        async function obtenerTemperaturaReal() {
-            const aioKey = getAioKey();
+        function inicializarGrafico(labels, data) {
+            const ctx = document.getElementById('tempChart').getContext('2d');
+            
+            // Gradiente para el área bajo la curva
+            const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+            gradient.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
+            gradient.addColorStop(1, 'rgba(56, 189, 248, 0.0)');
 
+            if (tempChart) tempChart.destroy();
+
+            tempChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Temperatura (°C)',
+                        data: data,
+                        borderColor: '#38bdf8',
+                        borderWidth: 2,
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 2,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8', maxTicksLimit: 6, font: { size: 10 } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#94a3b8', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function cargarDatosCompletos() {
+            const aioKey = getAioKey();
             if (!aioKey) {
-                document.getElementById("temp-terraza").innerText = "NO KEY";
+                document.getElementById("temp-exterior").innerText = "NO KEY";
                 return;
             }
 
-            const url = `https://io.adafruit.com/api/v2/${USERNAME}/feeds/${FEED_KEY}/data/last`;
-            
+            // Obtener los últimos 20 puntos de datos para la gráfica
+            const url = `https://io.adafruit.com/api/v2/${USERNAME}/feeds/${FEED_KEY}/data?limit=20`;
+
             try {
                 const response = await fetch(url, {
                     headers: { "X-AIO-Key": aioKey }
                 });
 
                 if (response.status === 401 || response.status === 403) {
-                    alert("Clave de Adafruit IO no válida. Revisa la clave configurada.");
+                    alert("Clave de Adafruit IO no válida.");
                     localStorage.removeItem("ADA_AIO_KEY");
-                    document.getElementById("temp-terraza").innerText = "AUTH ERR";
+                    document.getElementById("temp-exterior").innerText = "ERR";
                     return;
                 }
 
-                if (!response.ok) throw new Error("Error en la petición a Adafruit IO");
+                if (!response.ok) throw new Error("Error en la llamada a la API");
 
                 const data = await response.json();
-                const temperatura = parseFloat(data.value).toFixed(1);
+                if (data.length === 0) return;
 
-                // Actualizar interfaz HTML
-                document.getElementById("temp-terraza").innerText = temperatura;
+                // Ultima lectura (primer elemento del array devuelto)
+                const ultimaLectura = data[0];
+                const temperatura = parseFloat(ultimaLectura.value).toFixed(1);
                 
-                // Formatear hora de la lectura
-                const fechaLectura = new Date(data.created_at);
-                document.getElementById("time-stamp").innerText = fechaLectura.toLocaleTimeString();
+                document.getElementById("temp-exterior").innerText = temperatura;
+                
+                const fecha = new Date(ultimaLectura.created_at);
+                document.getElementById("time-stamp").innerText = fecha.toLocaleTimeString([], { hour: '2-2-digit', minute: '2-2-digit' });
 
-                // Estado visual del LED (Alerta si supera el rango definido)
-                const badge = document.getElementById("badge-terraza");
-                if (temperatura > 35.0 || temperatura < 0.0) {
-                    badge.classList.add("alert");
-                } else {
-                    badge.classList.remove("alert");
-                }
+                // Procesar datos para la gráfica (se invierten para orden cronológico)
+                const datosReversos = data.reverse();
+                const labels = datosReversos.map(item => {
+                    const d = new Date(item.created_at);
+                    return d.toLocaleTimeString([], { hour: '2-2-digit', minute: '2-2-digit' });
+                });
+                const valores = datosReversos.map(item => parseFloat(item.value));
+
+                inicializarGrafico(labels, valores);
 
             } catch (error) {
-                console.error("Error al obtener los datos:", error);
-                document.getElementById("temp-terraza").innerText = "ERR";
+                console.error("Error obteniendo datos de Adafruit IO:", error);
+                document.getElementById("temp-exterior").innerText = "ERR";
             }
         }
 
-        // Consultar API cada 15 segundos
-        setInterval(obtenerTemperaturaReal, 15000);
-        
-        // Primera lectura
-        obtenerTemperaturaReal();
+        // Refrescar automáticamente cada 30 segundos
+        setInterval(cargarDatosCompletos, 30000);
+
+        // Carga inicial
+        cargarDatosCompletos();
     </script>
 </body>
 </html>
