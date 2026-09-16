@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Temperatura Exterior</title>
-    <!-- Chart.js para la gráfica del histórico -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -49,14 +48,9 @@
             border-radius: 16px;
         }
 
-        h1 { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.02em; }
+        h1 { font-size: 1.25rem; font-weight: 600; }
         
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
+        .header-actions { display: flex; align-items: center; gap: 12px; }
         .last-update { font-size: 0.8rem; color: var(--text-muted); }
 
         .btn-config {
@@ -67,11 +61,9 @@
             border-radius: 8px;
             cursor: pointer;
             font-size: 0.8rem;
-            transition: all 0.2s ease;
         }
         .btn-config:hover { background: rgba(255, 255, 255, 0.15); color: var(--text-main); }
 
-        /* Tarjeta Principal de Temperatura */
         .main-card {
             background: var(--card-bg);
             backdrop-filter: blur(12px);
@@ -83,39 +75,11 @@
             justify-content: space-between;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
             position: relative;
-            overflow: hidden;
         }
 
-        .main-card::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 60%);
-            pointer-events: none;
-        }
-
-        .temp-display {
-            display: flex;
-            align-items: baseline;
-            gap: 4px;
-        }
-
-        .temp-value {
-            font-size: 4rem;
-            font-weight: 800;
-            color: var(--accent-blue);
-            line-height: 1;
-            letter-spacing: -0.03em;
-        }
-
-        .temp-unit {
-            font-size: 1.75rem;
-            font-weight: 300;
-            color: var(--text-muted);
-        }
+        .temp-display { display: flex; align-items: baseline; gap: 4px; }
+        .temp-value { font-size: 4rem; font-weight: 800; color: var(--accent-blue); line-height: 1; }
+        .temp-unit { font-size: 1.75rem; font-weight: 300; color: var(--text-muted); }
 
         .status-pill {
             display: flex;
@@ -129,41 +93,18 @@
             color: var(--text-muted);
         }
 
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: var(--status-ok);
-            box-shadow: 0 0 10px var(--status-ok);
-        }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--status-ok); }
 
-        .status-dot.alert {
-            background-color: var(--status-alert);
-            box-shadow: 0 0 10px var(--status-alert);
-        }
-
-        /* Contenedor del Gráfico */
         .chart-card {
             background: var(--card-bg);
             backdrop-filter: blur(12px);
             border: 1px solid var(--card-border);
             border-radius: 20px;
             padding: 20px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
         }
 
-        .chart-header {
-            font-size: 0.9rem;
-            font-weight: 500;
-            color: var(--text-muted);
-            margin-bottom: 16px;
-        }
-
-        .chart-wrapper {
-            position: relative;
-            height: 220px;
-            width: 100%;
-        }
+        .chart-header { font-size: 0.9rem; font-weight: 500; color: var(--text-muted); margin-bottom: 16px; }
+        .chart-wrapper { position: relative; height: 220px; width: 100%; }
     </style>
 </head>
 <body>
@@ -177,7 +118,6 @@
             </div>
         </header>
 
-        <!-- Bloque principal de lectura -->
         <div class="main-card">
             <div class="temp-display">
                 <span class="temp-value" id="temp-exterior">--</span>
@@ -189,7 +129,6 @@
             </div>
         </div>
 
-        <!-- Gráfica de histórico -->
         <div class="chart-card">
             <div class="chart-header">Histórico reciente</div>
             <div class="chart-wrapper">
@@ -218,17 +157,54 @@
             const nuevaKey = prompt("Introduce tu nueva Adafruit IO Active Key:");
             if (nuevaKey) {
                 localStorage.setItem("ADA_AIO_KEY", nuevaKey.trim());
-                cargarDatosCompletos();
+                actualizarDashboard();
             }
         }
 
-        function inicializarGrafico(labels, data) {
-            const ctx = document.getElementById('tempChart').getContext('2d');
-            
-            // Gradiente para el área bajo la curva
-            const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-            gradient.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
-            gradient.addColorStop(1, 'rgba(56, 189, 248, 0.0)');
+        // 1. Obtener última temperatura (Rápido y aislado)
+        async function obtenerUltimaLectura(aioKey) {
+            const url = `https://io.adafruit.com/api/v2/${USERNAME}/feeds/${FEED_KEY}/data/last`;
+            try {
+                const res = await fetch(url, { headers: { "X-AIO-Key": aioKey } });
+                if (res.status === 401 || res.status === 403) {
+                    localStorage.removeItem("ADA_AIO_KEY");
+                    document.getElementById("temp-exterior").innerText = "KEY ERR";
+                    return;
+                }
+                const data = await res.json();
+                document.getElementById("temp-exterior").innerText = parseFloat(data.value).toFixed(1);
+                const fecha = new Date(data.created_at);
+                document.getElementById("time-stamp").innerText = fecha.toLocaleTimeString([], { hour: '2-2-digit', minute: '2-2-digit' });
+            } catch (err) {
+                console.error("Error obteniendo última lectura:", err);
+                document.getElementById("temp-exterior").innerText = "ERR";
+            }
+        }
+
+        // 2. Obtener historial para la gráfica
+        async function obtenerHistórico(aioKey) {
+            const url = `https://io.adafruit.com/api/v2/${USERNAME}/feeds/${FEED_KEY}/data?limit=15`;
+            try {
+                const res = await fetch(url, { headers: { "X-AIO-Key": aioKey } });
+                if (!res.ok) return;
+                
+                const data = await res.json();
+                if (!Array.isArray(data) || data.length === 0) return;
+
+                const datosReversos = data.reverse();
+                const labels = datosReversos.map(item => new Date(item.created_at).toLocaleTimeString([], { hour: '2-2-digit', minute: '2-2-digit' }));
+                const valores = datosReversos.map(item => parseFloat(item.value));
+
+                renderizarGrafico(labels, valores);
+            } catch (err) {
+                console.error("Error obteniendo histórico:", err);
+            }
+        }
+
+        function renderizarGrafico(labels, data) {
+            const canvas = document.getElementById('tempChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
 
             if (tempChart) tempChart.destroy();
 
@@ -237,15 +213,12 @@
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: 'Temperatura (°C)',
                         data: data,
                         borderColor: '#38bdf8',
                         borderWidth: 2,
-                        backgroundColor: gradient,
+                        backgroundColor: 'rgba(56, 189, 248, 0.1)',
                         fill: true,
-                        tension: 0.3,
-                        pointRadius: 2,
-                        pointHoverRadius: 5
+                        tension: 0.3
                     }]
                 },
                 options: {
@@ -253,76 +226,23 @@
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        x: {
-                            grid: { display: false },
-                            ticks: { color: '#94a3b8', maxTicksLimit: 6, font: { size: 10 } }
-                        },
-                        y: {
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                            ticks: { color: '#94a3b8', font: { size: 10 } }
-                        }
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                        y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
                     }
                 }
             });
         }
 
-        async function cargarDatosCompletos() {
-            const aioKey = getAioKey();
-            if (!aioKey) {
-                document.getElementById("temp-exterior").innerText = "NO KEY";
-                return;
-            }
-
-            // Obtener los últimos 20 puntos de datos para la gráfica
-            const url = `https://io.adafruit.com/api/v2/${USERNAME}/feeds/${FEED_KEY}/data?limit=20`;
-
-            try {
-                const response = await fetch(url, {
-                    headers: { "X-AIO-Key": aioKey }
-                });
-
-                if (response.status === 401 || response.status === 403) {
-                    alert("Clave de Adafruit IO no válida.");
-                    localStorage.removeItem("ADA_AIO_KEY");
-                    document.getElementById("temp-exterior").innerText = "ERR";
-                    return;
-                }
-
-                if (!response.ok) throw new Error("Error en la llamada a la API");
-
-                const data = await response.json();
-                if (data.length === 0) return;
-
-                // Ultima lectura (primer elemento del array devuelto)
-                const ultimaLectura = data[0];
-                const temperatura = parseFloat(ultimaLectura.value).toFixed(1);
-                
-                document.getElementById("temp-exterior").innerText = temperatura;
-                
-                const fecha = new Date(ultimaLectura.created_at);
-                document.getElementById("time-stamp").innerText = fecha.toLocaleTimeString([], { hour: '2-2-digit', minute: '2-2-digit' });
-
-                // Procesar datos para la gráfica (se invierten para orden cronológico)
-                const datosReversos = data.reverse();
-                const labels = datosReversos.map(item => {
-                    const d = new Date(item.created_at);
-                    return d.toLocaleTimeString([], { hour: '2-2-digit', minute: '2-2-digit' });
-                });
-                const valores = datosReversos.map(item => parseFloat(item.value));
-
-                inicializarGrafico(labels, valores);
-
-            } catch (error) {
-                console.error("Error obteniendo datos de Adafruit IO:", error);
-                document.getElementById("temp-exterior").innerText = "ERR";
+        function actualizarDashboard() {
+            const key = getAioKey();
+            if (key) {
+                obtenerUltimaLectura(key);
+                obtenerHistórico(key);
             }
         }
 
-        // Refrescar automáticamente cada 30 segundos
-        setInterval(cargarDatosCompletos, 30000);
-
-        // Carga inicial
-        cargarDatosCompletos();
+        setInterval(actualizarDashboard, 30000);
+        actualizarDashboard();
     </script>
 </body>
 </html>
