@@ -94,7 +94,6 @@
 
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--status-ok); }
 
-        /* Contenedor del gráfico y debug independiente */
         .chart-card {
             background: var(--card-bg);
             backdrop-filter: blur(12px);
@@ -106,7 +105,39 @@
             gap: 12px;
         }
 
+        .chart-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
         .chart-header { font-size: 0.9rem; font-weight: 500; color: var(--text-muted); }
+
+        .range-selector {
+            display: flex;
+            gap: 4px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 3px;
+            border-radius: 8px;
+            border: 1px solid var(--card-border);
+        }
+
+        .btn-range {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn-range.active {
+            background: rgba(56, 189, 248, 0.2);
+            color: var(--accent-blue);
+        }
+
         .chart-wrapper { position: relative; height: 180px; width: 100%; }
 
         .chart-debug {
@@ -145,7 +176,14 @@
         </div>
 
         <div class="chart-card">
-            <div class="chart-header">Histórico reciente</div>
+            <div class="chart-header-row">
+                <div class="chart-header">Histórico</div>
+                <div class="range-selector">
+                    <button class="btn-range active" onclick="cambiarRango('1D', this)">1D</button>
+                    <button class="btn-range" onclick="cambiarRango('1S', this)">1S</button>
+                    <button class="btn-range" onclick="cambiarRango('1M', this)">1M</button>
+                </div>
+            </div>
             <div class="chart-wrapper">
                 <canvas id="tempChart"></canvas>
             </div>
@@ -157,6 +195,7 @@
         const USERNAME = "descor";
         const FEED_KEY = "terraza-temp";
         let tempChart = null;
+        let rangoActual = '1D';
 
         function getAioKey() {
             let key = localStorage.getItem("ADA_AIO_KEY");
@@ -175,7 +214,13 @@
             }
         }
 
-        // --- 1. LECTURA PRINCIPAL (TEMPERATURA ACTUAL) ---
+        function cambiarRango(rango, btn) {
+            rangoActual = rango;
+            document.querySelectorAll('.btn-range').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            obtenerHistorico();
+        }
+
         async function obtenerTemperaturaActual() {
             const aioKey = getAioKey();
             if (!aioKey) {
@@ -186,16 +231,12 @@
             const url = `https://io.adafruit.com/api/v2/${USERNAME}/feeds/${FEED_KEY}/data/last`;
 
             try {
-                const res = await fetch(url, {
-                    headers: { "X-AIO-Key": aioKey }
-                });
-
+                const res = await fetch(url, { headers: { "X-AIO-Key": aioKey } });
                 if (res.status === 401 || res.status === 403) {
                     localStorage.removeItem("ADA_AIO_KEY");
                     document.getElementById("temp-exterior").innerText = "KEY ERR";
                     return;
                 }
-
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
                 const data = await res.json();
@@ -205,38 +246,47 @@
                 document.getElementById("time-stamp").innerText = fecha.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
             } catch (err) {
-                console.error("Error en lectura actual:", err);
+                console.error("Error lectura actual:", err);
                 document.getElementById("temp-exterior").innerText = "ERR";
             }
         }
 
-        // --- 2. LECTURA Y RENDERIZADO DEL HISTÓRICO ---
         async function obtenerHistorico() {
             const aioKey = getAioKey();
             const debugBox = document.getElementById("chart-debug");
             if (!aioKey) return;
 
-            // Pedimos los ultimos 15 datos registrados
-            const url = `https://io.adafruit.com/api/v2/${USERNAME}/feeds/${FEED_KEY}/data?limit=15`;
+            let url = `https://io.adafruit.com/api/v2/${USERNAME}/feeds/${FEED_KEY}/data`;
+
+            // Construir parámetros de consulta según el rango seleccionado
+            if (rangoActual === '1D') {
+                url += `?limit=288`; // 24h a razón de 1 dato cada 5 min (288 lecturas)
+            } else if (rangoActual === '1S') {
+                url += `?resolution=60&limit=168`; // Promedios de 1 hora durante 7 días
+            } else if (rangoActual === '1M') {
+                url += `?resolution=1440&limit=30`; // Promedios de 1 día durante 30 días
+            }
 
             try {
-                const res = await fetch(url, {
-                    headers: { "X-AIO-Key": aioKey }
-                });
-
-                if (!res.ok) {
-                    throw new Error(`Error API (${res.status}: ${res.statusText})`);
-                }
+                const res = await fetch(url, { headers: { "X-AIO-Key": aioKey } });
+                if (!res.ok) throw new Error(`API Error (${res.status})`);
 
                 const data = await res.json();
+                if (!Array.isArray(data) || data.length === 0) throw new Error("Sin datos en el rango seleccionado.");
 
-                if (!Array.isArray(data) || data.length === 0) {
-                    throw new Error("La API no devolvió un array de datos válido.");
-                }
-
-                // Invertimos la lista para mostrar del mas antiguo al mas reciente
                 const datosReversos = [...data].reverse();
-                const labels = datosReversos.map(item => new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+
+                const labels = datosReversos.map(item => {
+                    const d = new Date(item.created_at);
+                    if (rangoActual === '1D') {
+                        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    } else if (rangoActual === '1S') {
+                        return `${d.getDate()}/${d.getMonth()+1} ${d.getHours()}:00`;
+                    } else {
+                        return `${d.getDate()}/${d.getMonth()+1}`;
+                    }
+                });
+
                 const valores = datosReversos.map(item => parseFloat(item.value));
 
                 renderizarGrafico(labels, valores);
@@ -267,7 +317,7 @@
                         backgroundColor: 'rgba(56, 189, 248, 0.1)',
                         fill: true,
                         tension: 0.3,
-                        pointRadius: 2
+                        pointRadius: rangoActual === '1D' ? 0 : 2 // Oculta puntos en 1D para suavizar la línea
                     }]
                 },
                 options: {
@@ -275,8 +325,14 @@
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 } } },
-                        y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+                        x: { 
+                            grid: { display: false }, 
+                            ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: 6 } 
+                        },
+                        y: { 
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' }, 
+                            ticks: { color: '#94a3b8', font: { size: 10 } } 
+                        }
                     }
                 }
             });
@@ -287,7 +343,8 @@
             obtenerHistorico();
         }
 
-        setInterval(refrescarTodo, 30000);
+        // Refresco automático cada 5 minutos (300.000 ms)
+        setInterval(refrescarTodo, 300000);
         refrescarTodo();
     </script>
 </body>
