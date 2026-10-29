@@ -4,190 +4,566 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Temperatura Exterior Terraza</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-            --card-bg: rgba(30, 41, 59, 0.7);
-            --card-border: rgba(255, 255, 255, 0.1);
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --accent-blue: #38bdf8;
-            --status-ok: #22c55e;
-            --status-err: #ef4444;
+            --bg-body: #090d16;
+            --bg-card: rgba(18, 24, 38, 0.75);
+            --bg-card-hover: rgba(24, 32, 51, 0.85);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --border-glow: rgba(56, 189, 248, 0.15);
+            
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            
+            --accent-cyan: #38bdf8;
+            --accent-blue: #2563eb;
+            --accent-orange: #f97316;
+            --status-green: #10b981;
+            --status-amber: #f59e0b;
+            --status-red: #ef4444;
+            
+            --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
-        
-        body { 
-            background: var(--bg-gradient); 
-            color: var(--text-main); 
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-body);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(56, 189, 248, 0.1) 0px, transparent 50%),
+                radial-gradient(at 50% 50%, rgba(15, 23, 42, 0.5) 0px, transparent 100%);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
             min-height: 100vh;
-            padding: 24px 16px;
             display: flex;
             justify-content: center;
             align-items: center;
+            padding: 24px 16px;
+            -webkit-font-smoothing: antialiased;
         }
 
-        .container {
+        .dashboard-container {
             width: 100%;
-            max-width: 480px;
+            max-width: 520px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* Glassmorphism Generic Card */
+        .glass-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+            transition: all 0.25s ease;
+        }
+
+        /* Header Card */
+        header.glass-card {
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-icon {
+            width: 28px;
+            height: 28px;
+            color: var(--accent-cyan);
+            flex-shrink: 0;
+        }
+
+        h1 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            color: var(--text-primary);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-icon {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            color: var(--text-secondary);
+            border-radius: 10px;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-icon:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: var(--text-primary);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .btn-icon svg {
+            width: 17px;
+            height: 17px;
+        }
+
+        .btn-icon.spinning svg {
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Hero Main Temperature Card */
+        .hero-card {
+            padding: 30px 24px;
             display: flex;
             flex-direction: column;
             gap: 20px;
+            position: relative;
+            overflow: hidden;
         }
 
-        header {
+        .hero-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 150px;
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.15) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .hero-top-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--card-border);
-            padding: 16px 20px;
-            border-radius: 16px;
         }
 
-        h1 { font-size: 1.1rem; font-weight: 600; }
-        
-        .header-actions { display: flex; align-items: center; gap: 12px; }
-        .last-update { font-size: 0.8rem; color: var(--text-muted); }
-
-        .btn-config {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--card-border);
+        .sensor-tag {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
             color: var(--text-muted);
-            padding: 6px 10px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.8rem;
         }
-        .btn-config:hover { background: rgba(255, 255, 255, 0.15); color: var(--text-main); }
 
-        .main-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--card-border);
-            border-radius: 20px;
-            padding: 32px 24px;
-            display: flex;
+        .status-badge {
+            display: inline-flex;
             align-items: center;
+            gap: 7px;
+            padding: 5px 12px;
+            border-radius: 100px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            color: var(--status-green);
+            transition: all 0.3s ease;
+        }
+
+        .status-badge.stale {
+            background: rgba(245, 158, 11, 0.1);
+            border-color: rgba(245, 158, 11, 0.25);
+            color: var(--status-amber);
+        }
+
+        .status-badge.error {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.25);
+            color: var(--status-red);
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background-color: currentColor;
+            box-shadow: 0 0 8px currentColor;
+        }
+
+        .temp-display-wrap {
+            display: flex;
+            align-items: baseline;
+            justify-content: flex-start;
+            gap: 4px;
+        }
+
+        .temp-value {
+            font-size: 4.8rem;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            line-height: 1;
+            color: var(--accent-cyan);
+            font-feature-settings: "tnum";
+            font-variant-numeric: tabular-nums;
+        }
+
+        .temp-unit {
+            font-size: 2.2rem;
+            font-weight: 400;
+            color: var(--text-muted);
+            letter-spacing: -0.02em;
+        }
+
+        .hero-meta-row {
+            display: flex;
             justify-content: space-between;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-        }
-
-        .temp-display { display: flex; align-items: baseline; gap: 4px; }
-        .temp-value { font-size: 4.5rem; font-weight: 800; color: var(--accent-blue); line-height: 1; }
-        .temp-unit { font-size: 2rem; font-weight: 300; color: var(--text-muted); }
-
-        .status-pill {
-            display: flex;
             align-items: center;
-            gap: 8px;
-            background: rgba(0, 0, 0, 0.2);
-            padding: 6px 12px;
-            border-radius: 20px;
-            border: 1px solid var(--card-border);
+            padding-top: 14px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
             font-size: 0.8rem;
-            color: var(--text-muted);
+            color: var(--text-secondary);
         }
 
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--status-ok); }
+        .last-update-time {
+            font-family: var(--font-mono);
+            font-weight: 500;
+            color: var(--text-primary);
+        }
 
-        .chart-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--card-border);
-            border-radius: 20px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
+        /* Stats Micro-Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
             gap: 12px;
         }
 
-        .chart-header-row {
+        .stat-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            text-align: left;
+        }
+
+        .stat-label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .stat-value {
+            font-family: var(--font-mono);
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Chart Section */
+        .chart-card {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .chart-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        .chart-header { font-size: 0.9rem; font-weight: 500; color: var(--text-muted); }
+        .chart-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
 
         .range-selector {
             display: flex;
-            gap: 4px;
-            background: rgba(0, 0, 0, 0.2);
+            background: rgba(0, 0, 0, 0.35);
             padding: 3px;
-            border-radius: 8px;
+            border-radius: 10px;
             border: 1px solid var(--card-border);
+            gap: 3px;
         }
 
         .btn-range {
             background: transparent;
             border: none;
             color: var(--text-muted);
-            padding: 4px 8px;
-            border-radius: 6px;
+            padding: 5px 11px;
+            border-radius: 7px;
             font-size: 0.75rem;
+            font-weight: 700;
             cursor: pointer;
-            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .btn-range:hover {
+            color: var(--text-primary);
         }
 
         .btn-range.active {
-            background: rgba(56, 189, 248, 0.2);
-            color: var(--accent-blue);
+            background: rgba(56, 189, 248, 0.15);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(56, 189, 248, 0.3);
         }
 
-        .chart-wrapper { position: relative; height: 180px; width: 100%; }
+        .chart-wrapper {
+            position: relative;
+            height: 220px;
+            width: 100%;
+        }
 
-        .chart-debug {
-            font-family: monospace;
+        .chart-notice {
+            font-family: var(--font-mono);
             font-size: 0.75rem;
-            color: var(--status-err);
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px dashed var(--status-err);
-            padding: 8px 12px;
-            border-radius: 8px;
+            color: var(--status-red);
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px dashed rgba(239, 68, 68, 0.3);
+            border-radius: 10px;
+            padding: 10px 14px;
             display: none;
-            word-break: break-all;
+            line-height: 1.4;
+        }
+
+        /* Key Configuration Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.25s ease;
+        }
+
+        .modal-overlay.open {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            width: 100%;
+            max-width: 420px;
+            background: #111827;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
+            transform: scale(0.95);
+            transition: all 0.25s ease;
+        }
+
+        .modal-overlay.open .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+        }
+
+        .modal-body p {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin-bottom: 12px;
+        }
+
+        .input-key {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 11px 14px;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .input-key:focus {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 6px;
+        }
+
+        .btn-modal {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-cancel {
+            background: transparent;
+            color: var(--text-muted);
+        }
+
+        .btn-cancel:hover {
+            color: var(--text-primary);
+        }
+
+        .btn-save {
+            background: var(--accent-cyan);
+            color: #0b1120;
+        }
+
+        .btn-save:hover {
+            background: #7dd3fc;
         }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <header>
-            <h1>Temperatura Exterior Terraza</h1>
+    <div class="dashboard-container">
+        
+        <!-- Header -->
+        <header class="glass-card">
+            <div class="header-title-box">
+                <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>
+                </svg>
+                <h1>Terraza Exterior</h1>
+            </div>
             <div class="header-actions">
-                <div class="last-update">Last update: <span id="time-stamp">--:--:--</span></div>
-                <button class="btn-config" onclick="configurarKey()">🔑 Key</button>
+                <button class="btn-icon" id="btn-refresh" title="Actualizar datos" onclick="refrescarTodo(true)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                    </svg>
+                </button>
+                <button class="btn-icon" title="Configurar clave AIO" onclick="abrirModalKey()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="7.5" cy="15.5" r="5.5"/>
+                        <path d="m21 2-9.6 9.6"/>
+                        <path d="m15.5 7.5 3 3L22 7l-3-3"/>
+                    </svg>
+                </button>
             </div>
         </header>
 
-        <div class="main-card">
-            <div class="temp-display">
-                <span class="temp-value" id="temp-exterior">--</span>
+        <!-- Main Card -->
+        <div class="glass-card hero-card">
+            <div class="hero-top-row">
+                <span class="sensor-tag">Sonda DS18B20</span>
+                <div class="status-badge" id="status-badge">
+                    <div class="status-dot"></div>
+                    <span id="status-text">Online</span>
+                </div>
+            </div>
+
+            <div class="temp-display-wrap">
+                <span class="temp-value" id="temp-exterior">--.-</span>
                 <span class="temp-unit">°C</span>
             </div>
-            <div class="status-pill">
-                <div class="status-dot"></div>
-                <span>Online</span>
+
+            <div class="hero-meta-row">
+                <span>Último dato</span>
+                <span class="last-update-time" id="time-stamp">--:--:--</span>
             </div>
         </div>
 
-        <div class="chart-card">
-            <div class="chart-header-row">
-                <div class="chart-header">Histórico</div>
+        <!-- Micro Stats (Min, Promedio, Max) -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-label">Mínima</span>
+                <span class="stat-value" id="stat-min">--.-°</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Media</span>
+                <span class="stat-value" id="stat-avg">--.-°</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Máxima</span>
+                <span class="stat-value" id="stat-max">--.-°</span>
+            </div>
+        </div>
+
+        <!-- History Chart Card -->
+        <div class="glass-card chart-card">
+            <div class="chart-header">
+                <div class="chart-title">Histórico</div>
                 <div class="range-selector">
                     <button class="btn-range active" onclick="cambiarRango('1D', this)">1D</button>
                     <button class="btn-range" onclick="cambiarRango('1S', this)">1S</button>
                     <button class="btn-range" onclick="cambiarRango('1M', this)">1M</button>
                 </div>
             </div>
+
             <div class="chart-wrapper">
                 <canvas id="tempChart"></canvas>
             </div>
-            <div class="chart-debug" id="chart-debug"></div>
+            <div class="chart-notice" id="chart-notice"></div>
+        </div>
+
+    </div>
+
+    <!-- Key Configuration Modal -->
+    <div class="modal-overlay" id="modal-key">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Adafruit IO Key</h3>
+            </div>
+            <div class="modal-body">
+                <p>Introduce tu <strong>Active Key</strong> de Adafruit IO para permitir la lectura segura de los feeds:</p>
+                <input type="password" id="input-aio-key" class="input-key" placeholder="aio_xxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+            </div>
+            <div class="modal-actions">
+                <button class="btn-modal btn-cancel" onclick="cerrarModalKey()">Cancelar</button>
+                <button class="btn-modal btn-save" onclick="guardarKey()">Guardar</button>
+            </div>
         </div>
     </div>
 
@@ -198,33 +574,49 @@
         let rangoActual = '1D';
 
         function getAioKey() {
-            let key = localStorage.getItem("ADA_AIO_KEY");
-            if (!key) {
-                key = prompt("Introduce tu Adafruit IO Active Key:");
-                if (key) localStorage.setItem("ADA_AIO_KEY", key.trim());
-            }
-            return key ? key.trim() : null;
+            return localStorage.getItem("ADA_AIO_KEY");
         }
 
-        function configurarKey() {
-            const nuevaKey = prompt("Introduce tu nueva Adafruit IO Active Key:");
-            if (nuevaKey) {
-                localStorage.setItem("ADA_AIO_KEY", nuevaKey.trim());
+        function abrirModalKey() {
+            const input = document.getElementById("input-aio-key");
+            input.value = getAioKey() || "";
+            document.getElementById("modal-key").classList.add("open");
+            input.focus();
+        }
+
+        function cerrarModalKey() {
+            document.getElementById("modal-key").classList.remove("open");
+        }
+
+        function guardarKey() {
+            const val = document.getElementById("input-aio-key").value.trim();
+            if (val) {
+                localStorage.setItem("ADA_AIO_KEY", val);
+                cerrarModalKey();
                 refrescarTodo();
             }
         }
 
         function cambiarRango(rango, btn) {
+            if (rangoActual === rango) return;
             rangoActual = rango;
             document.querySelectorAll('.btn-range').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             obtenerHistorico();
         }
 
+        function actualizarBadgeEstado(estado, mensaje) {
+            const badge = document.getElementById("status-badge");
+            const text = document.getElementById("status-text");
+            badge.className = `status-badge ${estado}`;
+            text.innerText = mensaje;
+        }
+
         async function obtenerTemperaturaActual() {
             const aioKey = getAioKey();
             if (!aioKey) {
-                document.getElementById("temp-exterior").innerText = "NO KEY";
+                actualizarBadgeEstado("error", "Sin Key");
+                document.getElementById("temp-exterior").innerText = "--.-";
                 return;
             }
 
@@ -232,73 +624,112 @@
 
             try {
                 const res = await fetch(url, { headers: { "X-AIO-Key": aioKey } });
+                
                 if (res.status === 401 || res.status === 403) {
-                    localStorage.removeItem("ADA_AIO_KEY");
+                    actualizarBadgeEstado("error", "Key Inválida");
                     document.getElementById("temp-exterior").innerText = "KEY ERR";
                     return;
                 }
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
                 const data = await res.json();
-                document.getElementById("temp-exterior").innerText = parseFloat(data.value).toFixed(1);
+                const tempNum = parseFloat(data.value);
+                
+                // Formateado a 1 solo decimal
+                document.getElementById("temp-exterior").innerText = tempNum.toFixed(1);
                 
                 const fecha = new Date(data.created_at);
-                document.getElementById("time-stamp").innerText = fecha.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                document.getElementById("time-stamp").innerText = fecha.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+                // Comprobar si el dato es reciente (< 10 minutos)
+                const diffMin = (new Date() - fecha) / (1000 * 60);
+                if (diffMin > 10) {
+                    actualizarBadgeEstado("stale", "Desconectado");
+                } else {
+                    actualizarBadgeEstado("", "Online");
+                }
 
             } catch (err) {
                 console.error("Error lectura actual:", err);
-                document.getElementById("temp-exterior").innerText = "ERR";
+                actualizarBadgeEstado("error", "Error API");
+                document.getElementById("temp-exterior").innerText = "--.-";
             }
         }
 
         async function obtenerHistorico() {
             const aioKey = getAioKey();
-            const debugBox = document.getElementById("chart-debug");
+            const notice = document.getElementById("chart-notice");
             if (!aioKey) return;
 
-            let url = `https://io.adafruit.com/api/v2/${USERNAME}/feeds/${FEED_KEY}/data`;
+            // Petición robusta de muestras para evitar errores 400 por agregaciones de pago
+            let limit = 720; // Hasta 24 horas a 2 min
+            if (rangoActual === '1S') limit = 1000;
+            if (rangoActual === '1M') limit = 1000;
 
-            if (rangoActual === '1D') {
-                url += `?limit=288`; // 24h a razón de 1 dato cada 5 min
-            } else if (rangoActual === '1S') {
-                url += `?resolution=60&limit=168`; // Promedios por hora durante 7 días
-            } else if (rangoActual === '1M') {
-                url += `?resolution=1440&limit=30`; // Promedios por día durante 30 días
-            }
+            const url = `https://io.adafruit.com/api/v2/${USERNAME}/feeds/${FEED_KEY}/data?limit=${limit}`;
 
             try {
                 const res = await fetch(url, { headers: { "X-AIO-Key": aioKey } });
-                if (!res.ok) throw new Error(`API Error (${res.status})`);
+                if (!res.ok) throw new Error(`Error en API Adafruit (${res.status})`);
 
-                const data = await res.json();
-                if (!Array.isArray(data) || data.length === 0) throw new Error("Sin datos en el rango seleccionado.");
+                const rawData = await res.json();
+                if (!Array.isArray(rawData) || rawData.length === 0) {
+                    throw new Error("No hay registros en Adafruit IO todavía.");
+                }
 
-                const datosReversos = [...data].reverse();
+                // Filtrar según el rango de tiempo seleccionado
+                const ahora = new Date().getTime();
+                let tiempoVentana = 24 * 60 * 60 * 1000; // 1D
+                if (rangoActual === '1S') tiempoVentana = 7 * 24 * 60 * 60 * 1000;
+                if (rangoActual === '1M') tiempoVentana = 30 * 24 * 60 * 60 * 1000;
 
-                const labels = datosReversos.map(item => {
+                const datosFiltrados = rawData
+                    .filter(item => (ahora - new Date(item.created_at).getTime()) <= tiempoVentana)
+                    .reverse();
+
+                if (datosFiltrados.length === 0) {
+                    throw new Error("Sin datos en el intervalo de tiempo seleccionado.");
+                }
+
+                // Downsampling para aligerar la gráfica en 1S y 1M
+                let datosFinales = datosFiltrados;
+                if (rangoActual === '1S' && datosFiltrados.length > 150) {
+                    const step = Math.ceil(datosFiltrados.length / 150);
+                    datosFinales = datosFiltrados.filter((_, i) => i % step === 0);
+                } else if (rangoActual === '1M' && datosFiltrados.length > 200) {
+                    const step = Math.ceil(datosFiltrados.length / 200);
+                    datosFinales = datosFiltrados.filter((_, i) => i % step === 0);
+                }
+
+                const labels = datosFinales.map(item => {
                     const d = new Date(item.created_at);
                     if (rangoActual === '1D') {
                         return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     } else if (rangoActual === '1S') {
-                        const dia = d.getDate();
-                        const mes = d.getMonth() + 1;
-                        const hora = String(d.getHours()).padStart(2, '0');
-                        const min = String(d.getMinutes()).padStart(2, '0');
-                        return `${dia}/${mes} ${hora}:${min}`;
+                        return `${d.getDate()}/${d.getMonth() + 1} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
                     } else {
-                        return `${d.getDate()}/${d.getMonth()+1}`;
+                        return `${d.getDate()}/${d.getMonth() + 1}`;
                     }
                 });
 
-                const valores = datosReversos.map(item => parseFloat(item.value));
+                const valores = datosFinales.map(item => parseFloat(item.value));
+
+                // Calcular estadísticas con 1 decimal
+                const min = Math.min(...valores);
+                const max = Math.max(...valores);
+                const avg = valores.reduce((a, b) => a + b, 0) / valores.length;
+
+                document.getElementById("stat-min").innerText = `${min.toFixed(1)}°`;
+                document.getElementById("stat-max").innerText = `${max.toFixed(1)}°`;
+                document.getElementById("stat-avg").innerText = `${avg.toFixed(1)}°`;
 
                 renderizarGrafico(labels, valores);
-                debugBox.style.display = "none";
+                notice.style.display = "none";
 
             } catch (err) {
                 console.error("Error cargando histórico:", err);
-                debugBox.innerText = `[DEBUG Histórico] ${err.message}`;
-                debugBox.style.display = "block";
+                notice.innerText = err.message;
+                notice.style.display = "block";
             }
         }
 
@@ -309,6 +740,11 @@
 
             if (tempChart) tempChart.destroy();
 
+            // Gradiente suave de fondo
+            const gradient = ctx.createLinearGradient(0, 0, 0, 220);
+            gradient.addColorStop(0, 'rgba(56, 189, 248, 0.28)');
+            gradient.addColorStop(1, 'rgba(56, 189, 248, 0.0)');
+
             tempChart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -316,43 +752,96 @@
                     datasets: [{
                         data: data,
                         borderColor: '#38bdf8',
-                        borderWidth: 2,
-                        backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                        borderWidth: 2.2,
+                        backgroundColor: gradient,
                         fill: true,
-                        tension: 0.3,
-                        pointRadius: rangoActual === '1D' ? 0 : 2
+                        tension: 0.35,
+                        pointRadius: rangoActual === '1D' ? 0 : 2,
+                        pointHoverRadius: 5,
+                        pointBackgroundColor: '#38bdf8',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 1.5
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleColor: '#94a3b8',
+                            bodyColor: '#38bdf8',
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1,
+                            padding: 10,
+                            displayColors: false,
+                            titleFont: { family: 'Plus Jakarta Sans', size: 11 },
+                            bodyFont: { family: 'JetBrains Mono', size: 13, weight: 'bold' },
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.parsed.y.toFixed(1)} °C`;
+                                }
+                            }
+                        }
+                    },
                     scales: {
-                        x: { 
-                            grid: { display: false }, 
-                            ticks: { 
-                                color: '#94a3b8', 
-                                font: { size: 10 }, 
-                                maxTicksLimit: 5,
+                        x: {
+                            grid: { display: false },
+                            ticks: {
+                                color: '#64748b',
+                                font: { family: 'JetBrains Mono', size: 10 },
+                                maxTicksLimit: 6,
                                 autoSkip: true
-                            } 
+                            }
                         },
-                        y: { 
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' }, 
-                            ticks: { color: '#94a3b8', font: { size: 10 } } 
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.04)',
+                                drawBorder: false
+                            },
+                            ticks: {
+                                color: '#64748b',
+                                font: { family: 'JetBrains Mono', size: 10 },
+                                callback: function(value) {
+                                    return value.toFixed(1) + '°';
+                                }
+                            }
                         }
                     }
                 }
             });
         }
 
-        function refrescarTodo() {
-            obtenerTemperaturaActual();
-            obtenerHistorico();
+        async function refrescarTodo(conAnimacion = false) {
+            const btn = document.getElementById("btn-refresh");
+            if (conAnimacion) btn.classList.add("spinning");
+
+            await Promise.all([
+                obtenerTemperaturaActual(),
+                obtenerHistorico()
+            ]);
+
+            if (conAnimacion) {
+                setTimeout(() => btn.classList.remove("spinning"), 600);
+            }
         }
 
-        setInterval(refrescarTodo, 300000); // 5 minutos
-        refrescarTodo();
+        // Comprobación inicial de Key
+        window.addEventListener("DOMContentLoaded", () => {
+            if (!getAioKey()) {
+                abrirModalKey();
+            } else {
+                refrescarTodo();
+            }
+        });
+
+        // Refresco automático cada 2 minutos (alineado con el envío del ESP8266)
+        setInterval(refrescarTodo, 120000);
     </script>
 </body>
 </html>
